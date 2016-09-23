@@ -41,6 +41,8 @@ namespace eval ::emberweb {
       png  image/png
       jpg  image/jpeg
       json application/json
+      js   text/javascript
+      css  text/css
    }
 }
 
