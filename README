@@ -1,5 +1,5 @@
 #
-# EmberWeb - A simple web handling framework for small systems.
+# TemberWeb - A simple web handling framework for small systems.
 # Writtin in tcl
 #
 # By Scott Beasley 2016
@@ -34,7 +34,7 @@ Copy the emberweb folder to your local tcl lib directory
 
 A simple example: (NOTE - url_parms is null for now)
 
-package require emberweb 1.0
+package require Temberweb 1.0
 package require Tcl      8.5
 
 proc forward {soc query_parms url_parms} {
