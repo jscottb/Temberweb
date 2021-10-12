@@ -1,8 +1,8 @@
 #
-# EmberWeb - A simple web handling framework for small systems.
+# TemberWeb - A simple web handling framework for small systems.
 # Writtin in tcl
 #
-# By Scott Beasley 2016
+# By Scott Beasley 2016, 2021
 #
 # Based off of Dustmote by Harold Kaplan 1998 - 2002.
 # See: http://wiki.tcl.tk/4333
@@ -10,73 +10,17 @@
 
 A simple Tcl only Web framework for small systems like the Raspberry Pi etc..
 
-A one night hack and a work in progress!
+A one night hack, with later additions. A work in progress...
 
 Documentation forthcoming.
 
 Temporary doc info:
-    - Route handler procs get a socket parm and dict with the parms.
-    - Only http GET is handled for now
+    - Route handler procs get a socket parm and dict with the parms and a list with any URL parms.
 
 TODO:
-    - Add POST request handling.
-    - Add examples
     - Document the lib
-    - Support simple url parameters. The url path is broken up into a list
-      and sent in as a parm to the route handler. i.e.: /users/add/jerry
-
-ADDED:
-    - A sendFile function. Can be used to render files in route handlers.
 
 Usage:
 
-Copy the emberweb folder to your local tcl lib directory
+Copy the temberweb folder to your local tcl lib directory
 
-A simple example: (NOTE - url_parms is null for now)
-
-package require emberweb 1.0
-package require Tcl      8.5
-
-proc forward {soc query_parms url_parms} {
-   puts "in Forward"
-   puts [dict get $query_parms x] # print the x parm sent
-   puts [dict get $query_parms y] # print the y parm sent
-   puts $soc "HTTP/1.0 [::emberweb::http_return 200]"
-   puts $soc "Connection: close"
-   puts $soc ""
-   close $soc
-}
-
-proc backward {soc query_parms url_parms} {
-   puts "in Backward"
-#   puts [lindex $url_parms 0]
-#   puts [lindex $url_parms 1]
-   puts $soc "HTTP/1.0 [::emberweb::http_return 200]"
-   puts $soc "Connection: close"
-   puts $soc ""
-   close $soc
-}
-
-proc left {soc query_parms url_parms} {
-   puts "in Left"
-   puts $soc "HTTP/1.0 [::emberweb::http_return 200]"
-   puts $soc "Connection: close"
-   puts $soc ""
-   close $soc
-}
-
-proc right {soc query_parms url_parms} {
-   puts "in Right"
-   puts $soc "HTTP/1.0 [::emberweb::http_return 200]"
-   puts $soc "Connection: close"
-   puts $soc ""
-   close $soc
-}
-
-::emberweb::addRoute {/forward} forward
-::emberweb::addRoute {/backward} backward
-::emberweb::addRoute {/left} left
-::emberweb::addRoute {/right} right
-# Start the server up and set your port, WWW html pages home and images home.
-::emberweb::run 8080 "c:/home/www/templates" \
-                     "c:/home/www/images"
