@@ -8,7 +8,7 @@
 # See: http://wiki.tcl.tk/4333
 #
 
-<b>!!! A WORK IN PROGRESS!!!</b>
+!!! A WORK IN PROGRESS!!!
 
 A simple Tcl only Web framework for small systems like the Raspberry Pi etc..
 
