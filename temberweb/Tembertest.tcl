@@ -28,7 +28,7 @@ proc post_action {soc method query_parms url_parms} {
 }
 
 ::Temberweb::addRoute {/withparms} withparms
-::Temberweb::addRoute {/withurlparms} withurlparms
+::Temberweb::addRoute {/withurlparms} withurlparms {GET DELETE}
 ::Temberweb::addRoute {/post_action_page} post_action "POST"
 
 # Start the server up and set your port, WWW html pages home and images home.
