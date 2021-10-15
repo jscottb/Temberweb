@@ -14,7 +14,8 @@ package require Tcl      8.5
 # Create the namespace
 namespace eval ::Temberweb {
    # Export commands
-   namespace export run addRoute contentType http_return response requestError 404NotFound
+   namespace export run addRoute contentType http_return response \
+             requestError 404NotFound addCookie addHeader
 
    variable root "./www"
    variable pages "templates"
@@ -25,13 +26,19 @@ namespace eval ::Temberweb {
    variable port 8080
    variable uri_handlers {}
    variable logging TRUE
-
+   variable cookies {}
+   variable headers {}   
    variable return_codes
+   variable host
+
    array set return_codes {
       200 {200 Ok}
       204 {204 No Content}
       400 {400 Bad Request}
+      401 {401 Unauthorized}
+      403 {403 Forbidden}
       404 {404 Not Found}
+      405 {405 Method Not Allowed}
    }
 
    variable content_types
@@ -66,6 +73,9 @@ proc ::Temberweb::processRequest {soc} {
    variable content_types
    variable return_codes
    variable logging
+   variable cookies
+   variable headers
+   variable host
 
    fconfigure $soc -blocking 0
    set reqLine [gets $soc]
@@ -88,31 +98,42 @@ proc ::Temberweb::processRequest {soc} {
 
    # Remove the HTTP/1.1
    set req_data [lrange $req_data 0 end-1]
-   set method [lindex $req_data 0]
+   set method [string trim [lindex $req_data 0]]
    set path [lindex $req_data 1]
    set parms [lindex $req_data 2]
    set content_len 0
    set post_parms {}
+   set cookies {}
+   set headers {}
+   set host {}
 
-   # Handle post data
-   if {$method == "POST"} {
-      while 1 {
-         set reqLine [gets $soc]
+   while 1 {
+      set reqLine [gets $soc]
 
-         if {[string first "CONTENT-LENGTH:" [string toupper [string trim $reqLine]]] != -1} {
-            set content_len [string trim [lindex [string range [string trim $reqLine] 7 end] 1]]
-         }
+      if {[string first "CONTENT-LENGTH:" [string toupper [string trim $reqLine]]] != -1} {
+         set content_len [string trim [lindex [string range [string trim $reqLine] 7 end] 1]]
+      }
 
-         if {[string trim $reqLine] == {}} {
+      if {[string first "COOKIE:" [string toupper [string trim $reqLine]]] != -1} {
+         set cookies [::Temberweb::cookiesTodict [string range $reqLine 8 end]]
+      }
+
+      if {[string first "HOST:" [string toupper [string trim $reqLine]]] == 0} {
+         set host [string trim [string range $reqLine 6 end]]
+      }
+
+      if {[string trim $reqLine] == {}} {
+         # Handle post data
+         if {$method == "POST"} {
             if {$content_len == 0} {
-               requestError $soc $return_codes(400)
-               close $soc
+               requestError $soc 400
                return
             }
 
             set post_parms [string trim [read $soc $content_len]]
-            break
          }
+
+         break
       }
    }
 
@@ -130,15 +151,19 @@ proc ::Temberweb::processRequest {soc} {
       if {[lindex $handler 0] eq "/[lindex $url_parms 1]"} {
          set url_parms [lrange $url_parms 2 end]
          # Build a dict of the parms.
-         if {$method == "GET"} {
+         if {$method == "POST"} {
+            set query_parms_dic [::Temberweb::parmsTodict $post_parms]
+         } else {
             set query_parms_dic [::Temberweb::parmsTodict $parms]
          }
 
-         if {$method == "POST"} {
-            set query_parms_dic [::Temberweb::parmsTodict $post_parms]
+         if {[lsearch [lindex $handler 2] $method] >= 0} {
+            eval {[lindex $handler 1] $soc $method $query_parms_dic $url_parms}
+         } else  {
+            requestError $soc 405
+            return
          }
 
-         eval {[lindex $handler 1] $soc $query_parms_dic $url_parms}
          return
       }
    }
@@ -212,9 +237,14 @@ proc ::Temberweb::http_return {ret_code} {
 
 proc ::Temberweb::response {soc data {code "200"} {type ""}} {
    variable content_types
+   variable headers
 
-   puts $soc "HTTP/1.0 $code"
+   puts $soc "HTTP/1.1 $code"
    puts $soc "Content-Type: $content_types($type)"
+   foreach header $headers {
+      puts $soc $header 
+      #puts $header
+   }
    puts $soc "Content-Length: [string length $data]"
    puts $soc ""
    puts $soc $data
@@ -233,6 +263,45 @@ proc ::Temberweb::parmsTodict {parms} {
    return $parms_dict
 }
 
+proc ::Temberweb::cookiesTodict {parms} {
+   set parms_dict {}
+
+   foreach var [split $parms ";\n"] {
+      set pair [split $var {=}]
+      dict set parms_dict [string trim [lindex $pair 0]] [string trim [lindex $pair 1]]
+   }
+
+   return $parms_dict
+}
+
+proc ::Temberweb::addCookie {cookiename cookieval {ttl {}} {attributes {}}} {
+   variable headers
+   variable host
+
+   set line {}
+
+   append line "Set-Cookie: $cookiename=$cookieval;"
+   if {$ttl != {}} {
+      set now [clock seconds]
+      set tzoffset [clock format [clock seconds] -format {%z}]
+      # Revisit the timezone offset maths later. Probably WRONG...
+      append line " Expires=[clock format [clock add $now [expr {$ttl - $tzoffset}] minutes] -format {%a, %d %b %Y %T GMT;}]"
+   }
+
+   if {$attributes != {}} {
+      append line $attributes {;}
+   }  
+
+   lappend headers $line
+   #puts $headers
+}
+
+proc ::Temberweb::addHeader {header} {
+   variable headers
+
+   lappend headers $header
+}
+
 proc ::Temberweb::sendFile {soc file {url_parms ""}} {
    variable content_types
    variable return_codes
@@ -243,7 +312,7 @@ proc ::Temberweb::sendFile {soc file {url_parms ""}} {
       set ext [file extension $file]
       fconfigure $fileChannel -translation binary
       fconfigure $soc -translation binary -buffering full
-      puts $soc "HTTP/1.0 $return_codes(200)"
+      puts $soc "HTTP/1.1 $return_codes(200)"
       puts $soc "Content-Type: $content_types([string trim $ext {.}])"
       puts $soc "Connection: close"
       puts $soc ""
