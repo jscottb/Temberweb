@@ -8,21 +8,29 @@
 # See: http://wiki.tcl.tk/4333
 #
 
-!!! A WORK IN PROGRESS!!!
+!!! A WORK IN PROGRESS !!! (Changing/Fixing as I use it :)
 
 A simple Tcl only Web framework for small systems like the Raspberry Pi etc..
 
-A one night hack, with later additions. A work in progress...
+A one-night hack, with later additions. A work in progress...
+
+Goals:
+    - To be a simple lightweight web framework similar to Flask.  
+    - Offer easy but flexible URL routing with a built-in web server.
+    - Have at least some REST-like uses.
+    - No external dependencies with an all-in-one source file. (Minus TLS :)
 
 Documentation forthcoming.
 
-Temporary doc info:
-    - Route handler procs get a socket parm and dict with the parms and a list with any URL parms.
-
 TODO:
-    - Document the lib
+    - Document the lib
+    - Add forwarding.
+    - Add TLS support.
+    - Possibly add page templating.
 
 Usage:
 
-Copy the temberweb folder to your local tcl lib directory
+Copy the temberweb folder to your local tcl lib directory and use 'package require Temberweb'
+Or copy to your project directory and use 'source temberweb.tcl'
+
 
