@@ -5,6 +5,7 @@ source temberweb.tcl
 proc withparms {soc method query_parms url_parms} {
    set x [dict get $query_parms x]
    set y [dict get $query_parms y]
+   #set f [dict get $query_parms f]
 
    ::Temberweb::response $soc "<html><head>/withparms</head><body><br><br>$x-$y<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
 }
@@ -14,8 +15,6 @@ proc withurlparms {soc method query_parms url_parms} {
 }
 
 proc post_action {soc method query_parms url_parms} {
-   puts "in post_action"
-
    set lname [dict get $query_parms lname]
    set fname [dict get $query_parms fname]
 
@@ -24,7 +23,7 @@ proc post_action {soc method query_parms url_parms} {
    ::Temberweb::addCookie "fname" $fname 1
    ::Temberweb::addCookie "lname" $lname {} "SameSite=Lax; HttpOnly"
    ::Temberweb::addCookie "name" "$fname$lname" 5
-   ::Temberweb::response $soc "<html><head>/post_action_page</head><body><br><br>Hello $fname $lname<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
+   ::Temberweb::response $soc "<html><head>/post_action_page</head><body><br><br>Host: [::Temberweb::getHost]<br><br>Hello $fname $lname<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
 }
 
 ::Temberweb::addRoute {/withparms} withparms

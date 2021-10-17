@@ -9,13 +9,13 @@
 #
 
 package provide Temberweb 1.0
-package require Tcl      8.5
 
 # Create the namespace
 namespace eval ::Temberweb {
    # Export commands
    namespace export run addRoute contentType http_return response \
-             requestError 404NotFound addCookie addHeader
+             requestError 404NotFound addCookie addHeader lurl_enc \
+             lurl_dec getHost
 
    variable root "./www"
    variable pages "templates"
@@ -30,6 +30,8 @@ namespace eval ::Temberweb {
    variable headers {}   
    variable return_codes
    variable host
+   variable url_enc_map {}
+   variable url_dec_map {}
 
    array set return_codes {
       200 {200 Ok}
@@ -76,6 +78,8 @@ proc ::Temberweb::processRequest {soc} {
    variable cookies
    variable headers
    variable host
+   variable url_enc_map
+   variable url_dec_map
 
    fconfigure $soc -blocking 0
    set reqLine [gets $soc]
@@ -152,9 +156,9 @@ proc ::Temberweb::processRequest {soc} {
          set url_parms [lrange $url_parms 2 end]
          # Build a dict of the parms.
          if {$method == "POST"} {
-            set query_parms_dic [::Temberweb::parmsTodict $post_parms]
-         } else {
-            set query_parms_dic [::Temberweb::parmsTodict $parms]
+            set query_parms_dic [::Temberweb::parmsTodict [::Temberweb::lurl_dec $post_parms]]
+         } else { # Parms for all other methods (DELETE, PUT, etc.) 
+            set query_parms_dic [::Temberweb::parmsTodict [::Temberweb::lurl_dec $parms]]
          }
 
          if {[lsearch [lindex $handler 2] $method] >= 0} {
@@ -321,6 +325,42 @@ proc ::Temberweb::sendFile {soc file {url_parms ""}} {
    }
 }
 
+proc ::Temberweb::url_encdec_init {} {
+   variable url_enc_map
+   variable url_dec_map
+
+   set url_dec_map {}
+   set url_enc_map {}
+
+   lappend url_dec_map + { }
+   lappend url_enc_map { } +
+   for {set ndx 0} {$ndx < 256} {incr ndx} {
+      set chr [format %c $ndx]
+      set code %[format %02x $ndx]
+
+      lappend url_enc_map $chr $code
+      lappend url_dec_map $code $chr
+   }
+}
+
+proc ::Temberweb::lurl_enc {in_str} {
+   variable url_enc_map  
+
+   return [string map $url_enc_map $in_str]
+}
+
+proc ::Temberweb::lurl_dec {in_str} { 
+   variable url_dec_map
+
+   return [string map $url_dec_map $in_str]
+}
+
+proc ::Temberweb::getHost {} { 
+   variable host
+
+   return $host
+}
+
 proc ::Temberweb::log {req_data} {
    variable log
    variable fd_log
@@ -358,6 +398,9 @@ proc ::Temberweb::run {{port_in 8080} {root_in ""} {pages_in ""} {image_root_in 
       set fd_log [open $root/$log/access.log "a"]
       ::Temberweb::log "Server started" 
    }
+
+   # Build the http encode and decode maps
+   ::Temberweb::url_encdec_init
 
    socket -server answer $port
    vwait forEver
