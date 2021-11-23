@@ -15,7 +15,8 @@ namespace eval ::Temberweb {
    # Export commands
    namespace export run addRoute contentType http_return response \
              requestError 404NotFound addCookie addHeader lurl_enc \
-             lurl_dec getHost
+             lurl_dec html_esc getHost getContentLen getContentType \
+             sendTemplate 
 
    variable root "./www"
    variable pages "templates"
@@ -26,12 +27,15 @@ namespace eval ::Temberweb {
    variable port 8080
    variable uri_handlers {}
    variable logging TRUE
+   variable content_len
+   variable content_type
    variable cookies {}
    variable headers {}   
    variable return_codes
    variable host
    variable url_enc_map {}
    variable url_dec_map {}
+   variable referer {}
 
    array set return_codes {
       200 {200 Ok}
@@ -41,6 +45,7 @@ namespace eval ::Temberweb {
       403 {403 Forbidden}
       404 {404 Not Found}
       405 {405 Method Not Allowed}
+      503 {503 Server error}
    }
 
    variable content_types
@@ -75,11 +80,14 @@ proc ::Temberweb::processRequest {soc} {
    variable content_types
    variable return_codes
    variable logging
+   variable content_len
+   variable content_type
    variable cookies
    variable headers
    variable host
    variable url_enc_map
    variable url_dec_map
+   variable referer
 
    fconfigure $soc -blocking 0
    set reqLine [gets $soc]
@@ -106,16 +114,27 @@ proc ::Temberweb::processRequest {soc} {
    set path [lindex $req_data 1]
    set parms [lindex $req_data 2]
    set content_len 0
+   set content_type 0
    set post_parms {}
    set cookies {}
    set headers {}
    set host {}
+   set referer {}
 
-   while 1 {
+   after 5000 {set looper 0}
+   set looper 1
+   while {$looper == 1} {
       set reqLine [gets $soc]
 
+      # Clean this up and make a proper parser
       if {[string first "CONTENT-LENGTH:" [string toupper [string trim $reqLine]]] != -1} {
-         set content_len [string trim [lindex [string range [string trim $reqLine] 7 end] 1]]
+         puts $reqLine
+         set content_len [string trim [lindex [string range [string trim $reqLine] 14 end] 1]]
+      }
+
+      if {[string first "CONTENT-TYPE:" [string toupper [string trim $reqLine]]] != -1} {
+         puts $reqLine
+         set content_type [string trim [lindex [string range [string trim $reqLine] 13 end] 1]]
       }
 
       if {[string first "COOKIE:" [string toupper [string trim $reqLine]]] != -1} {
@@ -126,17 +145,23 @@ proc ::Temberweb::processRequest {soc} {
          set host [string trim [string range $reqLine 6 end]]
       }
 
+      if {[string first "REFERER:" [string toupper [string trim $reqLine]]] == 0} {
+         set referer [string trim [string range $reqLine 8 end]]
+      }
+
       if {[string trim $reqLine] == {}} {
          # Handle post data
          if {$method == "POST"} {
             if {$content_len == 0} {
                requestError $soc 400
+               after cancel {set looper}
                return
             }
 
             set post_parms [string trim [read $soc $content_len]]
          }
 
+         after cancel {set looper}
          break
       }
    }
@@ -244,6 +269,8 @@ proc ::Temberweb::response {soc data {code "200"} {type ""}} {
    variable headers
 
    puts $soc "HTTP/1.1 $code"
+   puts $soc "Connection: close"
+   puts $soc "Content-Security-Policy: default-src 'self';\r"
    puts $soc "Content-Type: $content_types($type)"
    foreach header $headers {
       puts $soc $header 
@@ -284,8 +311,11 @@ proc ::Temberweb::addCookie {cookiename cookieval {ttl {}} {attributes {}}} {
 
    set line {}
 
-   append line "Set-Cookie: $cookiename=$cookieval;"
-   if {$ttl != {}} {
+   append line "Set-Cookie: $cookiename=$cookieval; HttpOnly;"
+
+   if {$cookieval == {}} {
+      append line " ; Max-Age=1"
+   } elseif {$ttl != {}} {
       set now [clock seconds]
       set tzoffset [clock format [clock seconds] -format {%z}]
       # Revisit the timezone offset maths later. Probably WRONG...
@@ -355,10 +385,32 @@ proc ::Temberweb::lurl_dec {in_str} {
    return [string map $url_dec_map $in_str]
 }
 
+proc ::Temberweb::html_esc {in_str} { 
+   return [string map {\" &quot; < &lt; > &gt; & &amp; \\ &#92;} $in_str]
+}
+
 proc ::Temberweb::getHost {} { 
    variable host
 
    return $host
+}
+
+proc ::Temberweb::getContentLen {} { 
+   variable content_len 
+
+   return $content_len
+}
+
+proc ::Temberweb::getContentType {} { 
+   variable content_type
+
+   return $content_type
+}
+
+proc ::Temberweb::getReferer {} { 
+   variable referer
+
+   return $referer
 }
 
 proc ::Temberweb::log {req_data} {
@@ -369,6 +421,37 @@ proc ::Temberweb::log {req_data} {
              [clock seconds] -format "%a, %d %b %Y %H:%M:%S"]
    puts $fd_log "$date: $req_data"
    flush $fd_log
+}
+
+# First hackish attempt for templating. Needs a lot of work.
+proc ::Temberweb::sendTemplate {soc template_name res_code} {
+   variable pages
+   variable root
+
+   if [catch {set fd_in [open $root/$pages/$template_name "r"]}] {
+      ::Temberweb::requestError $soc 503
+      return 1
+   }
+
+   set page_data {}
+   while {![eof $fd_in]} {
+      set line_in [gets $fd_in]
+
+      set full_match ""
+      set left_match ""
+      set body ""
+      set right_match ""
+
+      regexp {(<\?\=)(.*?)(\?>)} $line_in full_match left_match body right_match
+      if {$left_match == {<?=} && $right_match == {?>}} {
+         append page_data [eval $body] "\n"
+      } else {
+         append page_data $line_in "\n"
+      }
+   }
+
+   ::Temberweb::response $soc $page_data $res_code "html"
+   return 0
 }
 
 proc ::Temberweb::run {{port_in 8080} {root_in ""} {pages_in ""} {image_root_in ""} {dolog TRUE}} {

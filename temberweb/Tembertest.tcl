@@ -6,12 +6,12 @@ proc withparms {soc method query_parms url_parms} {
    set x [dict get $query_parms x]
    set y [dict get $query_parms y]
    #set f [dict get $query_parms f]
-
-   ::Temberweb::response $soc "<html><head>/withparms</head><body><br><br>$x-$y<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
+::Temberweb::sendTemplate $soc test_temp.tmpl 200
+   #::Temberweb::response $soc "<html><head>/withparms</head><body><br><br>$x-$y<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
 }
 
 proc withurlparms {soc method query_parms url_parms} {
-   ::Temberweb::response $soc "<html><head>/withurlparms</head><body><br><br>$url_parms<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
+   ::Temberweb::response $soc "<html><head>/withurlparms</head><body><br><br>$url_parms<br><br>[::Temberweb::getReferer]<a href=\"/\">Home</a><br></body></html>" 200 "html"
 }
 
 proc post_action {soc method query_parms url_parms} {
@@ -26,6 +26,7 @@ proc post_action {soc method query_parms url_parms} {
    ::Temberweb::response $soc "<html><head>/post_action_page</head><body><br><br>Host: [::Temberweb::getHost]<br><br>Hello $fname $lname<br><br><a href=\"/\">Home</a><br></body></html>" 200 "html"
 }
 
+set ::test_var "Hello!"
 ::Temberweb::addRoute {/withparms} withparms
 ::Temberweb::addRoute {/withurlparms} withurlparms {GET DELETE}
 ::Temberweb::addRoute {/post_action_page} post_action "POST"
