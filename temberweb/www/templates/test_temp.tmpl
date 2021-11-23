@@ -1,0 +1,16 @@
+<html>
+<body>
+<h2>Temberweb!</h2>
+Test default page.
+<br><br><br>
+<?=set ::test_var ?>
+<br><br>
+<br>
+<?=::Temberweb::html_esc {<script>This is a "test"</script>}?>
+<br><br>
+<a href="/withparms?x=1&y=2">With GET parms</a><br>
+<a href="/withurlparms/1/2/3/4">With URL parms</a><br>
+<a href="form.html">POST form test</a><br>
+<a href="/notfound">Not found test</a><br>
+</body>
+</html>
