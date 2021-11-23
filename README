@@ -26,8 +26,8 @@ TODO:
     - Document the lib
     - Add forwarding.
     - Add TLS support.
-    - Possibly add page templating.
-
+    - Add full templatimg. (Has simple now)
+    
 Usage:
 
 Copy the temberweb folder to your local tcl lib directory and use 'package require Temberweb'
